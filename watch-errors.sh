@@ -68,10 +68,16 @@ tam exception bilgisi ve stack trace var. Gorevin:
 2) Kaynak koddaki ilgili Java dosyasini DUZENLE (gercekten dosyayi degistir,
    sadece aciklama yazma) ve minimal, dogru bir duzeltme uygula (orn. eksik
    null-check ekle, eksik konfigurasyon/fallback mantigini duzelt).
-3) Degisikligi kisaca ozetle.
-4) Cevabinin EN BASINDA tek bir satirda su formatta yaz:
-   TR_OZET: <hatanin ne oldugunu anlatan kisa Turkce cumle>
-   Sonra normal aciklamani/ozetini yaz.
+3) Cevabinin EN BASINDA, baska hicbir sey yazmadan, TAM OLARAK su iki blogu
+   bu sirayla ve bu formatta yaz:
+   TR_OZET: <en fazla 10 kelimelik, kisa bir Turkce baslik - git commit
+   subject satiri gibi, nokta ile bitmesin>
+   TR_DETAY_START
+   <kok nedeni ve yapilan duzeltmeyi 2-3 kisa cumleyle ozetleyen duz metin -
+   madde imi, baslik ya da kod bloğu kullanma>
+   TR_DETAY_END
+   Bu iki bloktan SONRA istersen normal, daha uzun aciklamani yazabilirsin
+   (bu kisim commit mesajina dahil edilmeyecek, sadece log icin).
 Asla yeni bir exception sinifi ekleme ya da sorunu try/catch ile bastirma;
 gercek kok nedeni duzelt.
 
@@ -177,7 +183,7 @@ process_block() {
 
         local tr_ozet detay commit_msg_file
         tr_ozet="$(extract_tr_ozet "$ai_output_file" "$cls")"
-        detay="$(extract_detay "$ai_output_file")"
+        detay="$(extract_tr_detay "$ai_output_file")"
         commit_msg_file="$(mktemp "${TMP_DIR}/commitmsg.XXXXXX")"
         {
             printf 'fix: %s\n\n' "$tr_ozet"

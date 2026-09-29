@@ -73,22 +73,36 @@ run_ai_fix() {
 }
 
 # extract_tr_ozet AI_OUTPUT_FILE EXCEPTION_CLASS -> commit'in "Hata Aciklamasi"
-# satiri. AI'nin ciktisinda "TR_OZET:" etiketli satiri arar, yoksa jenerik
-# bir varsayilana duser.
+# satiri (commit subject'i). AI'nin ciktisinda "TR_OZET:" etiketli satiri
+# arar, yoksa jenerik bir varsayilana duser. Git commit subject konvansiyonuna
+# uymasi icin sert bir uzunluk siniri da uygulanir (AI talimati gormezden
+# gelse bile).
 extract_tr_ozet() {
     local tr_ozet
     tr_ozet="$(grep -m1 '^TR_OZET:' "$1" | sed 's/^TR_OZET: *//')"
     if [ -z "$tr_ozet" ]; then
         tr_ozet="${2##*.} hatasi duzeltildi"
     fi
+    if [ "${#tr_ozet}" -gt 72 ]; then
+        tr_ozet="${tr_ozet:0:69}..."
+    fi
     echo "$tr_ozet"
 }
 
-# extract_detay AI_OUTPUT_FILE -> commit'in "Yapilan Degisiklik" govdesi
-# (ANSI kodlari ve bos satirlar temizlenir, uzunluk sinirlanir).
-extract_detay() {
-    grep -v '^TR_OZET:' "$1" \
+# extract_tr_detay AI_OUTPUT_FILE -> commit'in "Yapilan Degisiklik" govdesi.
+# AI'nin ciktisindaki TR_DETAY_START/TR_DETAY_END arasindaki kisa ozeti
+# kullanir (ham/uzun AI ciktisini degil) - ANSI kodlari ve bos satirlar
+# temizlenir, guvenlik icin uzunluk yine de sinirlanir. Blok yoksa jenerik
+# bir varsayilana duser.
+extract_tr_detay() {
+    local detay
+    detay="$(sed -n '/^TR_DETAY_START$/,/^TR_DETAY_END$/p' "$1" \
+        | sed '1d;$d' \
         | sed -e 's/\x1b\[[0-9;]*m//g' \
         | sed -e '/^[[:space:]]*$/d' \
-        | head -c 4000
+        | head -c 800)"
+    if [ -z "$detay" ]; then
+        detay="Kaynak kodda tespit edilen kok neden AI tarafindan duzeltildi."
+    fi
+    echo "$detay"
 }
