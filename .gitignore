@@ -1,0 +1,7 @@
+target/
+logs/*.log
+!logs/.gitkeep
+.watch-tmp/
+*.class
+.idea/
+*.iml
