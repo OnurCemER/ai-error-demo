@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Hata blogundan alan cikarma, signature/slug helper'lari ve AI duzeltme cagrisi.
+
+# extract_field BLOCKFILE FIELD_NAME
+extract_field() {
+    grep -m1 "^$2: " "$1" | sed "s/^$2: //"
+}
+
+# extract_stack_trace BLOCKFILE
+extract_stack_trace() {
+    sed -n '/^STACK_TRACE:$/,/^===AI_ERROR_END===$/p' "$1" | sed '1d;$d'
+}
+
+# compute_signature BLOCKFILE -> 12 hex karakterlik kimlik
+# EXCEPTION_CLASS + com.demo.aierror icindeki ilk stack frame'e dayanir:
+# kod gercekten duzelmeden ayni satir tekrar hata veremeyeceginden, ayni
+# signature'in tekrar gorunmesi "henuz duzelmedi, ayni olay" anlamina gelir.
+compute_signature() {
+    local cls first_frame
+    cls="$(extract_field "$1" EXCEPTION_CLASS)"
+    first_frame="$(grep -m1 -E '^[[:space:]]*at com\.demo\.aierror' "$1" | sed 's/^[[:space:]]*at //')"
+    printf '%s|%s' "$cls" "$first_frame" | sha256sum | cut -c1-12
+}
+
+# short_slug EXCEPTION_CLASS -> kisa, url/branch-uyumlu slug
+# orn: java.lang.NullPointerException -> null-pointer-exception
+short_slug() {
+    local simple="${1##*.}"
+    echo "$simple" | sed -E 's/([a-z0-9])([A-Z])/\1-\2/g' | tr '[:upper:]' '[:lower:]' \
+        | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g'
+}
+
+# run_ai_fix PROMPT OUTPUT_FILE -> AI cagrisinin (opencode, basarisizsa claude
+# fallback) tum stdout/stderr cikisini OUTPUT_FILE'a yazar ve terminale de
+# akitir (canli demo gorunurlugu icin), basari/basarisizlik donduru.
+run_ai_fix() {
+    local prompt="$1" output_file="$2"
+    local opencode_ok=1
+
+    if [ "${SKIP_OPENCODE:-0}" = "1" ]; then
+        echo "[watch-errors] SKIP_OPENCODE=1, opencode atlanip dogrudan claude kullanilacak."
+        opencode_ok=0
+    else
+        echo "[watch-errors] opencode cagriliyor (model: $MODEL, timeout: ${OPENCODE_TIMEOUT}s)..."
+        # --dir bayragi bu ortamda WSL yollarini yanlis yorumluyor ("Failed to
+        # change directory"); bunun yerine calisma dizinine cd ediliyor. Bazi
+        # ucretsiz litellm modelleri cok yavas/tutarsiz yanit verebiliyor (canli
+        # demoda gozlendi: dakikalar surebiliyor), o yuzden sinirli bir sure
+        # sonra vazgecip claude fallback'ine geciliyor.
+        if (cd "$PROJECT_DIR" && timeout "${OPENCODE_TIMEOUT}s" opencode run "$prompt" \
+                --model "$MODEL" \
+                --agent build \
+                --format default 2>&1 | tee "$output_file"); then
+            echo "[watch-errors] opencode basariyla tamamlandi."
+        else
+            opencode_ok=0
+        fi
+    fi
+
+    if [ "$opencode_ok" = "0" ]; then
+        echo "[watch-errors] opencode basarisiz oldu ya da zaman asimina ugradi, claude CLI fallback deneniyor..."
+        if (cd "$PROJECT_DIR" && claude -p "$prompt" \
+                --dangerously-skip-permissions \
+                --add-dir "$PROJECT_DIR" \
+                --output-format text < /dev/null 2>&1 | tee "$output_file"); then
+            echo "[watch-errors] claude fallback basariyla tamamlandi."
+        else
+            echo "[watch-errors] claude fallback da basarisiz oldu. Manuel inceleme gerekiyor."
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# extract_tr_ozet AI_OUTPUT_FILE EXCEPTION_CLASS -> commit'in "Hata Aciklamasi"
+# satiri. AI'nin ciktisinda "TR_OZET:" etiketli satiri arar, yoksa jenerik
+# bir varsayilana duser.
+extract_tr_ozet() {
+    local tr_ozet
+    tr_ozet="$(grep -m1 '^TR_OZET:' "$1" | sed 's/^TR_OZET: *//')"
+    if [ -z "$tr_ozet" ]; then
+        tr_ozet="${2##*.} hatasi duzeltildi"
+    fi
+    echo "$tr_ozet"
+}
+
+# extract_detay AI_OUTPUT_FILE -> commit'in "Yapilan Degisiklik" govdesi
+# (ANSI kodlari ve bos satirlar temizlenir, uzunluk sinirlanir).
+extract_detay() {
+    grep -v '^TR_OZET:' "$1" \
+        | sed -e 's/\x1b\[[0-9;]*m//g' \
+        | sed -e '/^[[:space:]]*$/d' \
+        | head -c 4000
+}
