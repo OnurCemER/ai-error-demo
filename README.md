@@ -42,6 +42,7 @@ hata mesajıyla çıkar.
 | `GITHUB_TOKEN` | - | **evet** | Fine-grained PAT (Issues+PR+Contents: Read&Write yeterli), asla sohbete/koda yapıştırılmaz |
 | `CURL_CA_BUNDLE` | - | hayır | kurumsal iç CA sertifikası PEM yolu (bkz. TLS notu) |
 | `INSECURE_TLS` | `0` | hayır | `1` = TLS doğrulamasını kapatır (`-k`), her çağrıda uyarı basar — sadece son çare |
+| `OPENCODE_CA_BUNDLE` | `~/.config/corporate-ca/turktelekom-ca-bundle.pem` | hayır | litellm hub'ının (Node.js/opencode için) kurumsal CA'sı — dosya varsa otomatik `NODE_EXTRA_CA_CERTS` olarak kullanılır |
 
 `GITHUB_TOKEN`'ı kendi shell profilinizde (`~/.bashrc`/`~/.zshrc`) veya demo
 öncesi `export` ile ayarlayın; hiçbir zaman bu script'lere veya bir sohbete
@@ -83,15 +84,33 @@ sadece `ai-error-demo` reposuna erişimi olan, **Issues: Read&Write**,
 **Pull requests: Read&Write**, **Contents: Read&Write** izinli bir token
 oluşturun. `export GITHUB_TOKEN=...` ile kendi terminalinizde ayarlayın.
 
-### 4) TLS (genelde gerekmez)
+### 4) TLS — GitHub (genelde gerekmez)
 `api.github.com`/`github.com` public CA'larla imzalı olduğundan normalde
 ekstra bir şey gerekmez. Bir kurumsal proxy/MITM cihazı araya giriyorsa:
 ```bash
 export CURL_CA_BUNDLE=/path/to/corporate-ca-bundle.pem
 ```
 
-### 5) Ön kontroller
-- Port 8080 boş olmalı (`ss -ltnp | grep 8080`).
+### 5) TLS — litellm hub / opencode (yapıldı, gerekli)
+`opencode.json`'daki litellm endpoint'i (`aihub-api.turktelekom.com.tr`)
+kurumsal, kendinden imzalı bir sertifika kullanıyor. Node.js bunu varsayılan
+olarak reddediyor — bu da her istekte anlık TLS hatasına ve (SDK'nin iç
+tekrar deneme mantığı yüzünden) **dakikalarca süren gecikmelere/timeout'lara**
+yol açıyordu (gözlemlendi: 90s timeout'a takılma, bir seferinde ~11 dakika).
+Kurumsal CA'yı çıkarıp Node'un güven deposuna ekleyin:
+```bash
+mkdir -p ~/.config/corporate-ca
+echo | openssl s_client -connect aihub-api.turktelekom.com.tr:443 -showcerts 2>/dev/null \
+  | awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' \
+  > ~/.config/corporate-ca/turktelekom-ca-bundle.pem
+```
+`watch-errors.sh` bu dosya varsa otomatik olarak `NODE_EXTRA_CA_CERTS` olarak
+kullanır (bkz. `OPENCODE_CA_BUNDLE` ortam değişkeni) — ekstra bir ayar
+gerekmez. **Doğrulanmış etki**: opencode yanıt süresi 90s+ (timeout/fallback)
+→ ~9s'ye düştü.
+
+### 6) Ön kontroller
+- Uygulamanın `application.properties`'teki portu boş olmalı (`ss -ltnp | grep <port>`).
 - `opencode models` litellm modellerini listelemeli.
 - `claude --version` çalışmalı (fallback için).
 - `ssh -T git@github.com` → "successfully authenticated" dönmeli.
@@ -111,7 +130,7 @@ export GITHUB_TOKEN=...
 ./watch-errors.sh
 ```
 
-**Tarayıcı:** `http://localhost:8080`
+**Tarayıcı:** `http://localhost:8080` (ya da `application.properties`'te ayarladığınız port)
 
 1. "NullPointerException Firlat" butonuna basın.
 2. Sayfada hata fragment'i görünür.
@@ -162,17 +181,21 @@ rm -rf .watch-tmp
   resmi `ssh.github.com:443` alternatifi çalışıyor, `~/.ssh/config`'teki
   ayar bunu otomatik kullanıyor — farklı bir ağda çalıştırırken bu ayara
   gerek olmayabilir ama zararı yok.
-- **Test edildi ve uçtan uca çalışıyor** (temel akış — GitHub entegrasyonu
-  öncesi): NPE hatası için `claude` fallback ~1 dakikada doğru düzeltmeyi
-  uyguladı; `BusinessWarningException` hatası için `opencode` (model:
-  `litellm/moonshotai/Kimi-K2.7-Code`) doğru düzeltmeyi uyguladı ama **~11
-  dakika sürdü** — bazı ücretsiz litellm modelleri çok yavaş/tutarsız
-  olabiliyor. Varsayılan model bu yüzden `litellm/deepseek-ai/DeepSeek-V4-Flash`
-  olarak değiştirildi; script'te 90 saniyelik bir `timeout` var
-  (`OPENCODE_TIMEOUT` ile ayarlanabilir), süre aşılırsa otomatik `claude`
-  fallback'ine geçilir. **Canlı demodan önce** kullanacağınız modeli bir kere
-  elle deneyip gerçek yanıt süresini ölçmeniz önerilir; yavaşsa
-  `SKIP_OPENCODE=1` ile doğrudan `claude`'a geçebilirsiniz.
+- **opencode yavaşlığı/timeout'ları çözüldü**: kök neden litellm hub'ının
+  kurumsal, kendinden imzalı sertifikasıydı (bkz. yukarıdaki "TLS — litellm
+  hub" kurulum adımı) — Node.js'in bunu reddetmesi dakikalarca süren gizli
+  tekrar denemelere yol açıyordu. `OPENCODE_CA_BUNDLE` dosyası mevcutsa
+  script otomatik düzeltiyor (doğrulanan etki: 90s+ → ~9s). 90 saniyelik
+  `OPENCODE_TIMEOUT` yine de bir güvenlik sınırı olarak duruyor; süre
+  aşılırsa otomatik `claude` fallback'ine geçilir. Sertifika kurulumu
+  yapılmadıysa `SKIP_OPENCODE=1` ile doğrudan `claude`'a geçebilirsiniz.
+- **WSL ↔ Windows log izleme sorunu çözüldü**: uygulama Windows'ta (örn.
+  IntelliJ debug) çalışırken `tail -F`, WSL'e inotify olayları ulaşmadığı
+  için `logs/error.log`'daki yeni satırları hiç yakalamıyordu (bu coreutils
+  derlemesinde `--disable-inotify` de yok). `watch-errors.sh` artık
+  `poll_tail()` adlı, `stat()` tabanlı basit bir polling fonksiyonu
+  kullanıyor — hem WSL hem Windows tarafından yazılan log dosyalarında
+  güvenilir çalışır.
 - `index.html`/`app.js` AI tarafından değiştirilmez; tarayıcıda eski önbellek
   görürseniz sert yenileme yapın (Ctrl+Shift+R).
 - DevTools sadece derlenmiş `target/classes`'ı izler, `src/main/java`'yı değil

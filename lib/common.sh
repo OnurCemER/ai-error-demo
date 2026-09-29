@@ -68,12 +68,22 @@ run_ai_fix() {
         echo "[watch-errors] SKIP_OPENCODE=1, opencode atlanip dogrudan claude kullanilacak."
         opencode_ok=0
     else
+        # Kok neden bulundu: opencode.json'daki litellm hub'i
+        # (aihub-api.turktelekom.com.tr) kurumsal, kendinden imzali bir
+        # sertifika kullaniyor. Node.js bunu varsayilan olarak reddediyor;
+        # bu da her istekte anlik TLS hatasina ve (SDK'nin ic tekrar deneme
+        # mantigi yuzunden) dakikalarca suren gecikmelere/timeout'lara yol
+        # aciyordu (gozlemlendi: 90s timeout, hatta bir seferinde ~11 dakika).
+        # NODE_EXTRA_CA_CERTS ile kurumsal CA'yi Node'un guven deposuna
+        # eklemek bunu tamamen cozuyor (dogrulandi: 90s+ -> ~9s).
+        local opencode_ca_bundle="${OPENCODE_CA_BUNDLE:-$HOME/.config/corporate-ca/turktelekom-ca-bundle.pem}"
+        if [ -f "$opencode_ca_bundle" ]; then
+            export NODE_EXTRA_CA_CERTS="$opencode_ca_bundle"
+        fi
+
         echo "[watch-errors] opencode cagriliyor (model: $MODEL, timeout: ${OPENCODE_TIMEOUT}s)..."
         # --dir bayragi bu ortamda WSL yollarini yanlis yorumluyor ("Failed to
-        # change directory"); bunun yerine calisma dizinine cd ediliyor. Bazi
-        # ucretsiz litellm modelleri cok yavas/tutarsiz yanit verebiliyor (canli
-        # demoda gozlendi: dakikalar surebiliyor), o yuzden sinirli bir sure
-        # sonra vazgecip claude fallback'ine geciliyor.
+        # change directory"); bunun yerine calisma dizinine cd ediliyor.
         if (cd "$PROJECT_DIR" && timeout "${OPENCODE_TIMEOUT}s" opencode run "$prompt" \
                 --model "$MODEL" \
                 --agent build \
