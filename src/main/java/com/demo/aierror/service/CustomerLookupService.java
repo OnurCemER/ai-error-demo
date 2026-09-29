@@ -14,10 +14,12 @@ public class CustomerLookupService {
 
     public String getCustomerGreeting(String customerId) {
         Customer customer = customerDb.get(customerId);
-        // Onboarding'i tamamlanmamis musteriler icin address hala null olabilir,
-        // ama bu metot bunu kontrol etmiyor.
-        String city = customer.getAddress().getCity();
-        return "Merhaba " + customer.getName() + ", " + city + " sehrinden!";
+        // Onboarding'i tamamlanmamis musteriler icin address null olabilir.
+        Address address = customer.getAddress();
+        if (address == null || address.getCity() == null) {
+            return "Merhaba " + customer.getName() + "!";
+        }
+        return "Merhaba " + customer.getName() + ", " + address.getCity() + " sehrinden!";
     }
 
     private Map<String, Customer> buildCustomerDb() {
