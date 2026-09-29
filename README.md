@@ -16,6 +16,17 @@ Spring Boot DevTools sayesinde düzeltme sonrası uygulama otomatik yeniden
 başlar, böylece "butona bas → hata → GitHub issue → AI fix → PR" döngüsü
 canlı olarak izlenebilir.
 
+Demoda 5 farklı, gerçekçi hata senaryosu var (her biri farklı bir kök neden
+kategorisini temsil eder):
+
+| Buton | Exception | Kök neden kategorisi |
+|---|---|---|
+| NullPointerException Firlat | `NullPointerException` | eksik null-check |
+| Warning Firlat | `BusinessWarningException` (özel) | eksik konfigürasyon/fallback |
+| Array Index Hatasi Firlat | `ArrayIndexOutOfBoundsException` | eksik boyut/sınır kontrolü |
+| Sifira Bolme Hatasi Firlat | `ArithmeticException` | eksik boş-liste kontrolü |
+| Siparis Limiti Hatasi Firlat | `DailyOrderLimitExceededException` (özel) | eksik tarih filtresi (iş kuralı mantığı) |
+
 ## Gerekli araçlar
 
 `jq`, `curl`, `git`, `mvn`, `opencode` kurulu ve PATH'te olmalı. `jq` yoksa:
@@ -142,11 +153,12 @@ export GITHUB_TOKEN=...
 6. GitHub'da açılan issue'yu ve PR'ı gerçek arayüzde kontrol edin.
 
 **Önemli — sırayla test edin:** her yeni hata `origin/prod`'un en güncel
-halinden taze bir branch açtığı için, **birinci hatayı tam döngüsüyle
-(fix → restart → buton çalışıyor) bitirmeden ikinci hatayı tetiklemeyin** —
-aksi halde ikinci hata için yapılan checkout, birinci hatanın henüz
-commit/push edilmemiş yerel düzeltmesini çalışma ağacında geri alır (düzeltme
-kendi branch'inde güvende kalır, ama yerel demo anlık olarak "bozulmuş" görünür).
+halinden taze bir branch açtığı için, **bir hatayı tam döngüsüyle
+(fix → restart → buton çalışıyor) bitirmeden başka bir hatayı (5 butondan
+herhangi biri) tetiklemeyin** — aksi halde yeni hata için yapılan checkout,
+öncekinin henüz commit/push edilmemiş yerel düzeltmesini çalışma ağacında
+geri alır (düzeltme kendi branch'inde güvende kalır, ama yerel demo anlık
+olarak "bozulmuş" görünür).
 
 ## Demo sonrası sıfırlama — iki türü var
 
