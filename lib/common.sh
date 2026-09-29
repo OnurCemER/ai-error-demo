@@ -1,6 +1,33 @@
 #!/usr/bin/env bash
 # Hata blogundan alan cikarma, signature/slug helper'lari ve AI duzeltme cagrisi.
 
+# poll_tail FILE
+# "tail -F -n0"'a alternatif: dosyanin buyudugu her seferinde sadece YENI
+# baytlari basar (eski icerigi tekrar oynatmaz), sonsuza kadar calisir.
+# stat() tabanli polling kullanir, inotify'a guvenmez - cunku WSL'de bir
+# Windows surecinin /mnt/c altinda yazdigi degisiklikler icin inotify
+# olaylari WSL tarafina hic ulasmiyor (gozlemlendi: uygulama IntelliJ'den
+# Windows'ta calisirken tail -F hicbir zaman yeni satirlari yakalamiyordu,
+# --disable-inotify da bu coreutils derlemesinde mevcut degil). Bu fonksiyon
+# hem WSL-icinden hem Windows-tarafindan yazilan dosyalarda calisir.
+poll_tail() {
+    local file="$1"
+    local last_size
+    last_size="$(stat -c%s "$file" 2>/dev/null || echo 0)"
+    while true; do
+        local cur_size
+        cur_size="$(stat -c%s "$file" 2>/dev/null || echo 0)"
+        if [ "$cur_size" -gt "$last_size" ]; then
+            tail -c "+$((last_size + 1))" "$file"
+            last_size="$cur_size"
+        elif [ "$cur_size" -lt "$last_size" ]; then
+            # dosya kucaldi (reset/truncate edildi), bastan basla
+            last_size=0
+        fi
+        sleep 1
+    done
+}
+
 # extract_field BLOCKFILE FIELD_NAME
 extract_field() {
     grep -m1 "^$2: " "$1" | sed "s/^$2: //"

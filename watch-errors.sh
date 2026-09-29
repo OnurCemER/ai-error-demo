@@ -239,7 +239,7 @@ process_block() {
 
 echo "[watch-errors] ${LOG_FILE} izleniyor..."
 
-tail -F -n0 "$LOG_FILE" | \
+poll_tail "$LOG_FILE" | \
 awk -v tmpdir="$TMP_DIR" '
     /===AI_ERROR_START===/ { buf=""; capturing=1 }
     capturing { buf = buf $0 "\n" }
