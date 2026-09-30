@@ -21,10 +21,10 @@ public class OrderHistoryService {
     public String getRecentOrders(String customerId) {
         List<Order> orderList = orderHistory.getOrDefault(customerId, List.of());
         Order[] orders = orderList.toArray(new Order[0]);
-        // Son 3 siparisi listeler, ama musterinin en az 3 siparisi oldugunu
-        // varsayiyor ve dizi boyutunu kontrol etmiyor.
+        // Son 3 siparisi listeler; musterinin 3'ten az siparisi olabilir.
         StringBuilder sb = new StringBuilder("Son siparisler: ");
-        for (int i = 0; i < 3; i++) {
+        int count = Math.min(3, orders.length);
+        for (int i = 0; i < count; i++) {
             sb.append(orders[i].getId()).append(" ");
         }
         return sb.toString().trim();
