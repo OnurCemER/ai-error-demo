@@ -36,8 +36,11 @@ public class OrderHistoryService {
         for (Order order : orders) {
             total = total.add(order.getAmount());
         }
-        // Musterinin hic siparisi olmama ihtimalini (bos liste) kontrol
-        // etmeden siparis sayisina bolunuyor.
+        // Hic siparisi olmayan musteri icin sifira bolmeyi onlemek amaciyla
+        // ortalama 0 kabul edilir.
+        if (orders.isEmpty()) {
+            return "Ortalama siparis tutari: " + BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
         BigDecimal average = total.divide(BigDecimal.valueOf(orders.size()), 2, RoundingMode.HALF_UP);
         return "Ortalama siparis tutari: " + average;
     }
