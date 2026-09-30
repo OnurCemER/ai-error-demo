@@ -36,6 +36,30 @@ public class GlobalExceptionHandler {
         return friendlyErrorFragment("Is kurali uyarisi (BusinessWarningException).");
     }
 
+    @ExceptionHandler(ArrayIndexOutOfBoundsException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseBody
+    public String handleArrayIndexOutOfBounds(ArrayIndexOutOfBoundsException ex, HttpServletRequest request) {
+        logFullError(ex, request);
+        return friendlyErrorFragment("Dizi/liste sinir hatasi (ArrayIndexOutOfBoundsException).");
+    }
+
+    @ExceptionHandler(ArithmeticException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseBody
+    public String handleArithmetic(ArithmeticException ex, HttpServletRequest request) {
+        logFullError(ex, request);
+        return friendlyErrorFragment("Aritmetik hata (ArithmeticException).");
+    }
+
+    @ExceptionHandler(DailyOrderLimitExceededException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    @ResponseBody
+    public String handleDailyOrderLimitExceeded(DailyOrderLimitExceededException ex, HttpServletRequest request) {
+        logFullError(ex, request);
+        return friendlyErrorFragment("Is kurali hatasi (DailyOrderLimitExceededException).");
+    }
+
     private void logFullError(Exception ex, HttpServletRequest request) {
         StringWriter stackTrace = new StringWriter();
         ex.printStackTrace(new PrintWriter(stackTrace));

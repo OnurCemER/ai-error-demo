@@ -6,7 +6,7 @@
     <style>
         body {
             font-family: system-ui, sans-serif;
-            max-width: 640px;
+            max-width: 720px;
             margin: 60px auto;
             padding: 0 20px;
             color: #1a1a1a;
@@ -16,6 +16,7 @@
         }
         .buttons {
             display: flex;
+            flex-wrap: wrap;
             gap: 12px;
             margin: 24px 0;
         }
@@ -26,12 +27,7 @@
             border-radius: 6px;
             cursor: pointer;
             color: white;
-        }
-        #btn-npe {
             background: #d9480f;
-        }
-        #btn-warning {
-            background: #e8590c;
         }
         button:hover {
             filter: brightness(0.9);
@@ -55,6 +51,9 @@
     <div class="buttons">
         <button id="btn-npe">NullPointerException Firlat</button>
         <button id="btn-warning">Warning Firlat</button>
+        <button id="btn-array-index">Array Index Hatasi Firlat</button>
+        <button id="btn-arithmetic">Sifira Bolme Hatasi Firlat</button>
+        <button id="btn-business-limit">Siparis Limiti Hatasi Firlat</button>
     </div>
     <div id="result">Sonuc burada gorunecek.</div>
     <script src="app.js"></script>
