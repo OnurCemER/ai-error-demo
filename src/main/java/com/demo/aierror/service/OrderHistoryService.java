@@ -44,11 +44,11 @@ public class OrderHistoryService {
 
     public String checkDailyOrderLimit(String customerId) {
         List<Order> orders = orderHistory.getOrDefault(customerId, List.of());
-        // Gunluk limit kontrolu icin musterinin TUM zamanlardaki siparis
-        // sayisini kullaniyor, sadece bugunku siparisleri filtrelemesi
-        // gerekirken. Gecmiste cok siparis vermis ama bugun hic siparis
-        // vermemis bir musteri yanlislikla limite takiliyor.
-        long orderCount = orders.size();
+        // Gunluk limit sadece bugunku siparisler uzerinden hesaplanir.
+        LocalDate today = LocalDate.now();
+        long orderCount = orders.stream()
+            .filter(order -> today.equals(order.getOrderDate()))
+            .count();
         if (orderCount >= DAILY_ORDER_LIMIT) {
             throw new DailyOrderLimitExceededException(
                 "Musteri " + customerId + " gunluk siparis limitine (" + DAILY_ORDER_LIMIT + ") ulasti.");
